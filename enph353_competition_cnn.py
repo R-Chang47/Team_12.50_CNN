@@ -16,7 +16,7 @@ import numpy as np
 import os
 from PIL import Image, ImageFont, ImageDraw
 import re
-from google.colab.patches import cv2_imshow
+#from google.colab.patches import cv2_imshow
 
 ##Import more data generator libraries
 from keras.preprocessing.image import ImageDataGenerator
@@ -26,13 +26,13 @@ import numpy as np
 import math
 
 ##Put images in folder into array and tagged list
-image_dir = '/content/drive/MyDrive/clue_images'
+image_dir = '/home/fizzer/ros_ws/src/my_controller/node/clue_images'
 
 image_file_list = os.listdir(image_dir)
 imgs = []
 filenames = []
 for i in range(len(image_file_list)):
-  imgs.append(Image.open('/content/drive/MyDrive/clue_images/' + image_file_list[i]))
+  imgs.append(cv2.imread('/home/fizzer/ros_ws/src/my_controller/node/clue_images/' + image_file_list[i]))
   filenames.append(image_file_list[i])
 image_array = np.array(imgs)
 for i in range(len(image_array)):
@@ -40,7 +40,7 @@ for i in range(len(image_array)):
 image_list = list(zip(imgs, filenames))
 
 ##Alters and zips plate images into dataset
-NUM_IMAGES_TO_GENERATE = 220
+NUM_IMAGES_TO_GENERATE = 256
 
 datagen = ImageDataGenerator(rotation_range=0, zoom_range=0.01,
                              brightness_range=[0.7, 1.3])
@@ -50,10 +50,12 @@ datagen_iterator = datagen.flow(image_array, batch_size=1, shuffle=False)
 subimg = []
 label = []
 for i in range(NUM_IMAGES_TO_GENERATE):
+  print(i)
   value = next(datagen_iterator)
   img = value[0].astype('uint8')
   for j in range(12):
     subimg.append(img[178:228, 18+32*j:51+32*j])
+    #print(subimg[-1])
     #cv2_imshow(subimg[12*i+j])
     label_letter = image_list[i % len(image_list)][1][j]
     if re.search("[A-Z]", label_letter):
@@ -66,9 +68,11 @@ for i in range(NUM_IMAGES_TO_GENERATE):
 dataset = list(zip(subimg, label))
 
 ##Organize dataset into training and validation input and output sets
-VALIDATION_SPLIT = 0.2
+VALIDATION_SPLIT = 0.3
+TEST_SPLIT = 0.15
 
 split_index = math.ceil(len(dataset) * (1-VALIDATION_SPLIT))
+test_split_index = math.ceil(len(dataset) * (1-TEST_SPLIT))
 
 np.random.shuffle(dataset)
 X_dataset_full, Y_dataset_full = zip(*dataset)
@@ -77,8 +81,10 @@ Y_dataset_full = list(Y_dataset_full)
 
 X_train_dataset = X_dataset_full[:split_index]
 Y_train_dataset = Y_dataset_full[:split_index]
-X_val_dataset = X_dataset_full[split_index:]
-Y_val_dataset = Y_dataset_full[split_index:]
+X_val_dataset = X_dataset_full[split_index:test_split_index]
+Y_val_dataset = Y_dataset_full[split_index:test_split_index]
+X_test_dataset = X_dataset_full[test_split_index:]
+Y_test_dataset = Y_dataset_full[test_split_index:]
 print(np.array(Y_train_dataset).shape)
 
 print("X shape: " + str(len(dataset)))
@@ -129,7 +135,7 @@ conv_model.add(layers.Dense(512, activation='relu'))
 conv_model.add(layers.Dense(27, activation='softmax'))
 
 ##Set the learning rate and compile the CNN model
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 5e-5
 conv_model.compile(loss='categorical_crossentropy',
                    optimizer=optimizers.RMSprop(learning_rate=LEARNING_RATE),
                    metrics=['acc'])
@@ -138,8 +144,9 @@ reset_weights(conv_model)
 ## Run and display the CNN model fitting
 history_conv = conv_model.fit(np.array(X_train_dataset), np.array(Y_train_dataset),
                               validation_data=(np.array(X_val_dataset), np.array(Y_val_dataset)),
-                              epochs=100,
-                              batch_size=8)
+                              epochs=200,
+                              batch_size=16)
+conv_model.save("CNN.keras")
 
 ##Plot training and validation loss over epochs
 plt.plot(history_conv.history['loss'])
@@ -159,19 +166,51 @@ plt.xlabel('epoch')
 plt.legend(['train accuracy', 'val accuracy'], loc='upper left')
 plt.show()
 
-##Plot the confusion matrix for the training and validation data
+# ##Plot the confusion matrix for the training and validation data
 import sklearn.metrics
+
 Y_predict = []
 for i in range(len(X_dataset_full)):
   img = X_dataset_full[i]
+
+  img_aug = np.expand_dims(img, axis=0)
+  vector = conv_model.predict(img_aug, verbose=None)[0]
+  letter = chr(np.argmax(vector)+65)
+  print(vector)
+  print(letter)
+  Y_predict.append(vector)
+
+gnd_truth = []
+predictions = []
+for i in range(len(Y_dataset_full)):
+  gnd_truth.append(Y_dataset_full[i].index(max(Y_dataset_full[i])))
+  predictions.append(list(Y_predict[i]).index(max(list(Y_predict[i]))))
+
+C_matrix = sklearn.metrics.confusion_matrix(gnd_truth, predictions)
+
+import seaborn as sn
+import pandas as pd
+import matplotlib.pyplot as plt
+
+df_cm = pd.DataFrame(C_matrix, index = [i for i in "ABCDEFGHIJKLMNOPQRSTUVWXYZ "],
+                  columns = [i for i in "ABCDEFGHIJKLMNOPQRSTUVWXYZ "])
+plt.figure(figsize=(20,14))
+sn.set(font_scale=1.4) # for label size
+sn.heatmap(df_cm, annot=True, annot_kws={"size": 16}) # font size
+
+plt.show()
+
+Y_predict = []
+for i in range(len(X_test_dataset)):
+  img = X_test_dataset[i]
 
   img_aug = np.expand_dims(img, axis=0)
   Y_predict.append(conv_model.predict(img_aug, verbose=None)[0])
 
 gnd_truth = []
 predictions = []
-for i in range(len(Y_dataset_full)):
-  gnd_truth.append(Y_dataset_full[i].index(max(Y_dataset_full[i])))
+for i in range(len(Y_test_dataset)):
+  gnd_truth.append(Y_test_dataset[i].index(max(Y_test_dataset[i])))
   predictions.append(list(Y_predict[i]).index(max(list(Y_predict[i]))))
 
 C_matrix = sklearn.metrics.confusion_matrix(gnd_truth, predictions)
@@ -206,6 +245,6 @@ def displayImage(index):
            horizontalalignment='left', verticalalignment='bottom')
 
 
-interact(displayImage,
-        index=ipywidgets.IntSlider(min=0, max=len(dataset),
-                                   step=1, value=10))
+# interact(displayImage,
+#         index=ipywidgets.IntSlider(min=0, max=len(dataset),
+#                                    step=1, value=10))
