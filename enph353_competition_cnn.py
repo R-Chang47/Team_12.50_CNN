@@ -40,7 +40,7 @@ for i in range(len(image_array)):
 image_list = list(zip(imgs, filenames))
 
 ##Alters and zips plate images into dataset
-NUM_IMAGES_TO_GENERATE = 256
+NUM_IMAGES_TO_GENERATE = 666
 
 datagen = ImageDataGenerator(rotation_range=0, zoom_range=0.01,
                              brightness_range=[0.7, 1.3])
@@ -144,9 +144,9 @@ reset_weights(conv_model)
 ## Run and display the CNN model fitting
 history_conv = conv_model.fit(np.array(X_train_dataset), np.array(Y_train_dataset),
                               validation_data=(np.array(X_val_dataset), np.array(Y_val_dataset)),
-                              epochs=200,
+                              epochs=120,
                               batch_size=16)
-conv_model.save("CNN.keras")
+conv_model.save("CNN_new.keras")
 
 ##Plot training and validation loss over epochs
 plt.plot(history_conv.history['loss'])
@@ -227,22 +227,22 @@ sn.heatmap(df_cm, annot=True, annot_kws={"size": 16}) # font size
 
 plt.show()
 
-from ipywidgets import interact
-import ipywidgets as ipywidgets
-# Display images in the training data set.
-def displayImage(index):
-  img = X_dataset_full[index]
+# from ipywidgets import interact
+# import ipywidgets as ipywidgets
+# # Display images in the training data set.
+# def displayImage(index):
+#   img = X_dataset_full[index]
 
-  img_aug = np.expand_dims(img, axis=0)
-  y_predict = conv_model.predict(img_aug)[0]
+#   img_aug = np.expand_dims(img, axis=0)
+#   y_predict = conv_model.predict(img_aug)[0]
 
-  plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-  caption = ("                  One-Hot Vector\n"+
-             "GND truth: {:}\nPredicted: {:}".
-             format(Y_dataset_full[index], np.round(y_predict, 3)))
-  plt.text(0.5, 0.5, caption,
-           color='orange', fontsize = 9,
-           horizontalalignment='left', verticalalignment='bottom')
+#   plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+#   caption = ("                  One-Hot Vector\n"+
+#              "GND truth: {:}\nPredicted: {:}".
+#              format(Y_dataset_full[index], np.round(y_predict, 3)))
+#   plt.text(0.5, 0.5, caption,
+#            color='orange', fontsize = 9,
+#            horizontalalignment='left', verticalalignment='bottom')
 
 
 # interact(displayImage,
