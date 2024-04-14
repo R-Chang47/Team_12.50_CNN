@@ -40,7 +40,7 @@ for i in range(len(image_array)):
 image_list = list(zip(imgs, filenames))
 
 ##Alters and zips plate images into dataset
-NUM_IMAGES_TO_GENERATE = 666
+NUM_IMAGES_TO_GENERATE = 738
 
 datagen = ImageDataGenerator(rotation_range=0, zoom_range=0.01,
                              brightness_range=[0.7, 1.3])
@@ -60,9 +60,11 @@ for i in range(NUM_IMAGES_TO_GENERATE):
     label_letter = image_list[i % len(image_list)][1][j]
     if re.search("[A-Z]", label_letter):
       hot = ord(label_letter) - 65 # Capital 'A' has ASCII value 65
+    elif re.search("[0-9]", label_letter):
+      hot = ord(label_letter) - 48 + 26 # 0 has ASCII value 48 plus 26
     else: # it's a space
-      hot = 26
-    label.append(np.zeros(27, int).tolist())
+      hot = 36
+    label.append(np.zeros(37, int).tolist())
     label[-1][hot] = 1
     #print(label[-1])
 dataset = list(zip(subimg, label))
@@ -132,7 +134,7 @@ conv_model.add(layers.MaxPooling2D((2, 2)))
 conv_model.add(layers.Flatten())
 conv_model.add(layers.Dropout(0.5))
 conv_model.add(layers.Dense(512, activation='relu'))
-conv_model.add(layers.Dense(27, activation='softmax'))
+conv_model.add(layers.Dense(37, activation='softmax'))
 
 ##Set the learning rate and compile the CNN model
 LEARNING_RATE = 5e-5
@@ -144,9 +146,9 @@ reset_weights(conv_model)
 ## Run and display the CNN model fitting
 history_conv = conv_model.fit(np.array(X_train_dataset), np.array(Y_train_dataset),
                               validation_data=(np.array(X_val_dataset), np.array(Y_val_dataset)),
-                              epochs=120,
+                              epochs=40,
                               batch_size=16)
-conv_model.save("CNN_new.keras")
+conv_model.save("CNN_num.keras")
 
 ##Plot training and validation loss over epochs
 plt.plot(history_conv.history['loss'])
@@ -176,8 +178,8 @@ for i in range(len(X_dataset_full)):
   img_aug = np.expand_dims(img, axis=0)
   vector = conv_model.predict(img_aug, verbose=None)[0]
   letter = chr(np.argmax(vector)+65)
-  print(vector)
-  print(letter)
+  # print(vector)
+  # print(letter)
   Y_predict.append(vector)
 
 gnd_truth = []
@@ -192,8 +194,8 @@ import seaborn as sn
 import pandas as pd
 import matplotlib.pyplot as plt
 
-df_cm = pd.DataFrame(C_matrix, index = [i for i in "ABCDEFGHIJKLMNOPQRSTUVWXYZ "],
-                  columns = [i for i in "ABCDEFGHIJKLMNOPQRSTUVWXYZ "])
+df_cm = pd.DataFrame(C_matrix, index = [i for i in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 "],
+                  columns = [i for i in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 "])
 plt.figure(figsize=(20,14))
 sn.set(font_scale=1.4) # for label size
 sn.heatmap(df_cm, annot=True, annot_kws={"size": 16}) # font size
@@ -219,8 +221,8 @@ import seaborn as sn
 import pandas as pd
 import matplotlib.pyplot as plt
 
-df_cm = pd.DataFrame(C_matrix, index = [i for i in "ABCDEFGHIJKLMNOPQRSTUVWXYZ "],
-                  columns = [i for i in "ABCDEFGHIJKLMNOPQRSTUVWXYZ "])
+df_cm = pd.DataFrame(C_matrix, index = [i for i in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 "],
+                  columns = [i for i in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 "])
 plt.figure(figsize=(20,14))
 sn.set(font_scale=1.4) # for label size
 sn.heatmap(df_cm, annot=True, annot_kws={"size": 16}) # font size
